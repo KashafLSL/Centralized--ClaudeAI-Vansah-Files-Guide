@@ -1,0 +1,20 @@
+# Credentials — NEVER commit these
+VansahConfig.json
+**/settings.json
+*.env
+.env.*
+
+# Build output
+bin/
+obj/
+*.user
+*.suo
+.vs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+*.DotSettings.user
