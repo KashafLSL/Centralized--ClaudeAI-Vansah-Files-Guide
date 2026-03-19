@@ -21,7 +21,7 @@ All rules below are MANDATORY and override Claude's default behaviour.
 
 | Artifact | Path pattern |
 |----------|-------------|
-| AI-generated feature files | `vFluxAutomation/FeatureFiles/AITestingBDD/<FeatureName>.feature` |
+| AI-generated feature files | `vFluxAutomation/FeatureFiles/<FeatureName>.feature` |
 | Manual feature files | `vFluxAutomation/FeatureFiles/<Area>/<FeatureName>Feature.feature` |
 | Step definitions | `vFluxAutomation/StepDefinitions/<Area>/<FeatureName>Steps.cs` |
 | Helper classes | `vFluxHelperLibrary/<Area>Helper.cs` |
