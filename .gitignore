@@ -1,5 +1,7 @@
-# Credentials — NEVER commit these
-VansahConfig.json
+# Credentials — NEVER commit the real config with tokens
+# The template in config/VansahConfig.json is safe and IS tracked
+**/VansahConfig.json
+!config/VansahConfig.json
 **/settings.json
 *.env
 .env.*

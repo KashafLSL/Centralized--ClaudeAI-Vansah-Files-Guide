@@ -1,0 +1,9 @@
+{
+  "VansahApiUrl":     "https://prodde.vansah.com",
+  "VansahToken":      "YOUR_VANSAH_API_TOKEN",
+  "ProjectKey":       "YOUR_PROJECT_KEY",
+  "FolderIdentifier": "",
+  "FeatureFilePath":  "FeatureFiles/AITestingBDD",
+  "FeatureFileName":  "",
+  "TypeIdentifier":   "YOUR_TYPE_UUID"
+}
