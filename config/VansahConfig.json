@@ -3,7 +3,7 @@
   "VansahToken":      "YOUR_VANSAH_API_TOKEN",
   "ProjectKey":       "YOUR_PROJECT_KEY",
   "FolderIdentifier": "",
-  "FeatureFilePath":  "FeatureFiles/AITestingBDD",
-  "FeatureFileName":  "",
-  "TypeIdentifier":   "YOUR_TYPE_UUID"
+  "FeatureFilePath":  "YOUR_FEATUREFILE_PATH",
+  "FeatureFileName":  "YOUR_FEATUREFILE_NAME",
+  "TypeIdentifier":   "b3194fef-1e56-11ef-ab0d-a6c8f8be5ecf" 
 }
