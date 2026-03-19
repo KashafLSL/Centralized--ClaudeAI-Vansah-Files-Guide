@@ -21,7 +21,7 @@ All rules below are MANDATORY and override Claude's default behaviour.
 
 | Artifact | Path pattern |
 |----------|-------------|
-| AI-generated feature files | `vFluxAutomation/FeatureFiles/AITestingBDD/<FeatureName>.feature` |
+| AI-generated feature files | `vFluxAutomation/FeatureFiles/<FeatureName>.feature` |
 | Manual feature files | `vFluxAutomation/FeatureFiles/<Area>/<FeatureName>Feature.feature` |
 | Step definitions | `vFluxAutomation/StepDefinitions/<Area>/<FeatureName>Steps.cs` |
 | Helper classes | `vFluxHelperLibrary/<Area>Helper.cs` |
@@ -205,8 +205,8 @@ Before updating `FolderIdentifier`, Claude MUST stop and ask:
 Only set it after the user supplies the value.
 
 ### 8.3 FeatureFilePath
-- Keep as `FeatureFiles/AITestingBDD` for all AI-generated files
-- Only change if the file is in a subfolder (e.g. `FeatureFiles/AITestingBDD/UsingVansah`)
+- Set to the path of the folder containing the feature file, relative to the project root
+- The user specifies this path when running /generate-bdd — Claude does not assume a default
 
 ---
 
