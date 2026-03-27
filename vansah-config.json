@@ -1,0 +1,7 @@
+{
+  "VansahApiUrl":     "https://prodde.vansah.com",
+  "VansahToken":      "<your-vansah-token>",
+  "ProjectKey":       "VFL",
+  "FolderIdentifier": "<folder-uuid>",
+  "TypeIdentifier":   "<type-uuid-or-leave-empty>"
+}
