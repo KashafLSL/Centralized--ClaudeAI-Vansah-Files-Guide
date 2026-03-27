@@ -3,5 +3,8 @@
   "VansahToken":      "<your-vansah-token>",
   "ProjectKey":       "VFL",
   "FolderIdentifier": "<folder-uuid>",
-  "TypeIdentifier":   "<type-uuid-or-leave-empty>"
+  "TypeIdentifier":   "<type-uuid-or-leave-empty>",
+
+  "FeatureFilePath":  "<relative-folder-path-or-leave-empty>",
+  "FeatureFileName":  "<MyFeature.feature-or-leave-empty>"
 }
