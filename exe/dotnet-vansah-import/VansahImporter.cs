@@ -7,19 +7,14 @@ using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
-namespace Vansah.Tools
+namespace vFluxAutomation.Tools
 {
     /// <summary>
     /// Parses a Gherkin .feature file and imports each Scenario into Vansah via REST API.
-    ///
-    /// 4-step import flow (order is mandatory):
-    ///   Step 1 — POST /api/v1/testCase                     : create the test case
-    ///   Step 2 — PUT  /api/v1/testCase/{id}                : set script type to BDD
-    ///   Step 3 — POST /api/v1/testCase/{id}/testScript     : create the BDD testScript record
-    ///   Step 4 — PUT  /api/v1/testCase/testScript/{id}     : write Given/When/Then steps
-    ///
-    /// IMPORTANT: Step 2 (set BDD mode) MUST run before Step 3 (create testScript),
-    /// otherwise steps are created in multi-step format instead of BDD format.
+    /// Step 1 — POST /api/v1/testCase                    : create the test case
+    /// Step 2 — PUT  /api/v1/testCase/{id}               : set script type to BDD
+    /// Step 3 — POST /api/v1/testCase/{id}/testScript    : create the BDD testScript record
+    /// Step 4 — PUT  /api/v1/testCase/testScript/{id}    : write Given/When/Then steps
     /// </summary>
     public class VansahImporter
     {
@@ -62,16 +57,25 @@ namespace Vansah.Tools
 
         private List<ScenarioData> ParseScenarios(string content)
         {
-            var scenarios  = new List<ScenarioData>();
-            var lines      = content.Split(new[] { '\r', '\n' }, StringSplitOptions.None);
+            var scenarios    = new List<ScenarioData>();
+            var lines        = content.Split(new[] { '\r', '\n' }, StringSplitOptions.None);
             ScenarioData current    = null;
             bool         inExamples = false;
+            var          pendingTags = new List<string>();
 
             foreach (var raw in lines)
             {
                 var line = raw.Trim();
 
-                if (string.IsNullOrWhiteSpace(line) || line.StartsWith("@")) continue;
+                if (string.IsNullOrWhiteSpace(line)) continue;
+
+                // Capture tags — accumulate until the next Scenario line
+                if (line.StartsWith("@"))
+                {
+                    foreach (var token in line.Split(' '))
+                        if (token.StartsWith("@")) pendingTags.Add(token);
+                    continue;
+                }
 
                 if (line.StartsWith("#"))
                 {
@@ -82,6 +86,7 @@ namespace Vansah.Tools
 
                 if (line.StartsWith("Feature:") || line.StartsWith("Background:"))
                 {
+                    pendingTags.Clear();
                     current = null;
                     continue;
                 }
@@ -94,8 +99,10 @@ namespace Vansah.Tools
                     inExamples = false;
                     current = new ScenarioData
                     {
-                        Title = line.Replace("Scenario Outline:", "").Replace("Scenario:", "").Trim()
+                        Title = line.Replace("Scenario Outline:", "").Replace("Scenario:", "").Trim(),
+                        Tags  = new List<string>(pendingTags)
                     };
+                    pendingTags.Clear();
                     continue;
                 }
 
@@ -119,6 +126,19 @@ namespace Vansah.Tools
             return scenarios;
         }
 
+        // ── Label resolver ────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Reads @Automatable / @NonAutomatable from scenario tags and returns the
+        /// Vansah label name, or null if neither tag is present.
+        /// </summary>
+        private static string ResolveLabel(ScenarioData scenario)
+        {
+            if (scenario.Tags.Contains("@Automatable"))    return "Automatable";
+            if (scenario.Tags.Contains("@NonAutomatable")) return "Non-Automatable";
+            return null;
+        }
+
         // ── Step 1: Create test case ──────────────────────────────────────────────
 
         private async Task<bool> CreateTestCaseAsync(ScenarioData scenario)
@@ -133,6 +153,11 @@ namespace Vansah.Tools
 
             if (!string.IsNullOrWhiteSpace(_config.TypeIdentifier))
                 body["type"] = new JObject { ["identifier"] = _config.TypeIdentifier };
+
+            // Map @Automatable / @NonAutomatable tag → Vansah label field
+            var label = ResolveLabel(scenario);
+            if (label != null)
+                body["label"] = new JArray { label };
 
             var httpContent = new StringContent(body.ToString(Formatting.Indented), Encoding.UTF8, "application/json");
 
@@ -151,7 +176,8 @@ namespace Vansah.Tools
                     if (!string.IsNullOrEmpty(key) && !string.IsNullOrEmpty(identifier))
                         await SetBddStepsAsync(key, identifier, scenario);
 
-                    Console.WriteLine($"  [OK]   {scenario.Title}  →  {key}");
+                    var labelTag = ResolveLabel(scenario) ?? "—";
+                    Console.WriteLine($"  [OK]   {scenario.Title}  →  {key}  [{labelTag}]");
                     return true;
                 }
                 else
@@ -168,19 +194,21 @@ namespace Vansah.Tools
             }
         }
 
-        // ── Steps 2-4: Set BDD mode then attach steps ─────────────────────────────
+        // ── Step 2: Attach BDD steps ──────────────────────────────────────────────
 
         private async Task SetBddStepsAsync(string caseKey, string testCaseIdentifier, ScenarioData scenario)
         {
-            // Step 2: PUT — set script type to BDD (must happen before creating testScript)
-            var setTypeBody    = new JObject { ["scriptType"] = "bdd", ["caseVersion"] = 1 };
+            // Step 2a: PUT to set the test case script type to BDD and apply the label
+            var setTypeBody = new JObject { ["scriptType"] = "bdd", ["caseVersion"] = 1 };
+            var caseLabel   = ResolveLabel(scenario);
+            if (caseLabel != null)
+                setTypeBody["label"] = new JArray { caseLabel };
             var setTypeContent = new StringContent(setTypeBody.ToString(Formatting.None), Encoding.UTF8, "application/json");
-            await _httpClient.PutAsync(
-                $"{_config.VansahApiUrl.TrimEnd('/')}/api/v1/testCase/{testCaseIdentifier}",
-                setTypeContent);
+            await _httpClient.PutAsync($"{_config.VansahApiUrl.TrimEnd('/')}/api/v1/testCase/{testCaseIdentifier}", setTypeContent);
 
-            // Step 3: POST — create the BDD testScript record
-            var createBody = new JObject
+            // Step 2b: POST to create the BDD testScript record
+            // URL: /api/v1/testCase/{testCaseIdentifier}/testScript
+            var createBody    = new JObject
             {
                 ["scriptType"]      = "bdd",
                 ["project"]         = new JObject { ["key"] = _config.ProjectKey },
@@ -204,26 +232,26 @@ namespace Vansah.Tools
                 return;
             }
 
-            // Step 4: PUT — write Given/When/Then steps to the testScript
-            var stepsBody = new JObject
+            // Step 2c: PUT BDD steps to the testScript
+            var body = new JObject
             {
                 ["scriptType"]      = "bdd",
                 ["project"]         = new JObject { ["key"] = _config.ProjectKey },
                 ["bddData"]         = BuildStepsText(scenario),
                 ["testCaseVersion"] = 1
             };
-            var stepsContent = new StringContent(stepsBody.ToString(Formatting.None), Encoding.UTF8, "application/json");
-            var stepsUrl     = $"{_config.VansahApiUrl.TrimEnd('/')}/api/v1/testCase/testScript/{scriptId}";
-            var stepsResp    = await _httpClient.PutAsync(stepsUrl, stepsContent);
-            var stepsRaw     = await stepsResp.Content.ReadAsStringAsync();
+            var httpContent = new StringContent(body.ToString(Formatting.None), Encoding.UTF8, "application/json");
+            var url         = $"{_config.VansahApiUrl.TrimEnd('/')}/api/v1/testCase/testScript/{scriptId}";
 
-            if (stepsResp.IsSuccessStatusCode)
+            var response = await _httpClient.PutAsync(url, httpContent);
+            var raw      = await response.Content.ReadAsStringAsync();
+            if (response.IsSuccessStatusCode)
                 Console.WriteLine($"  [BDD]  {caseKey} → steps set OK (scriptId: {scriptId})");
             else
-                Console.WriteLine($"  [WARN] BDD steps not set for {caseKey}: HTTP {(int)stepsResp.StatusCode}: {stepsRaw}");
+                Console.WriteLine($"  [WARN] BDD steps not set for {caseKey}: HTTP {(int)response.StatusCode}: {raw}");
         }
 
-        // ── Build steps-only Gherkin text (no Scenario: header) ──────────────────
+        // ── Builds the steps-only Gherkin text (no Scenario: header) ─────────────
 
         private string BuildStepsText(ScenarioData scenario)
         {
@@ -251,6 +279,7 @@ namespace Vansah.Tools
             public string       Precondition { get; set; } = "";
             public List<string> Steps        { get; set; } = new List<string>();
             public List<string> ExampleRows  { get; set; } = new List<string>();
+            public List<string> Tags         { get; set; } = new List<string>();
         }
     }
 
